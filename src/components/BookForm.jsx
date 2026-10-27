@@ -31,26 +31,71 @@ export default function BookForm({ editingId, setEditingId }) {
     setError('');
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const title = form.title.trim();
-    const author = form.author.trim();
-    const genre = form.genre.trim();
-    const isbn = form.isbn.trim();
-    const quantity = parseInt(form.quantity, 10);
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!title || !author || !genre || !isbn || isNaN(quantity) || quantity < 0) {
-      setError('Fill in every field with a valid, non-negative quantity.');
+  const title = form.title.trim();
+  const author = form.author.trim();
+  const genre = form.genre.trim();
+  const isbn = form.isbn.trim();
+  const quantity = Number(form.quantity);
+
+  if (
+    !title ||
+    !author ||
+    !genre ||
+    !isbn ||
+    form.quantity.trim() === '' ||
+    !Number.isInteger(quantity) ||
+    quantity < 0
+  ) {
+    setError('Fill in every field with a valid, non-negative quantity.');
+    return;
+  }
+
+  setError('');
+
+  try {
+    const url = editingId
+      ? `http://localhost:5000/api/books/${editingId}`
+      : 'http://localhost:5000/api/books';
+
+    const response = await fetch(url, {
+      method: editingId ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title,
+        author,
+        genre,
+        isbn,
+        quantity
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data.message || 'Could not save the book.');
       return;
     }
 
-    if (editingId) {
-      setBooks(books.map(b => b.id === editingId ? { ...b, title, author, genre, isbn, quantity } : b));
-    } else {
-      setBooks([...books, { id: uid('bk'), title, author, genre, isbn, quantity }]);
+    const booksResponse = await fetch('http://localhost:5000/api/books');
+
+    if (!booksResponse.ok) {
+      setError('The book was saved, but the catalog could not refresh.');
+      return;
     }
+
+    const updatedBooks = await booksResponse.json();
+    setBooks(updatedBooks);
     reset();
-  };
+  } catch {
+    setError('Could not connect to the server. Check that the backend is running.');
+  }
+};
+
 
   return (
     <div className="panel" id="bookFormPanel" ref={panelRef}>
